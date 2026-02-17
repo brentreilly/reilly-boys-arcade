@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Dogfight — Hudson's Arcade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      overflow: hidden;
+      background: #0a0a0a;
+      font-family: 'Press Start 2P', monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #ui-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #ui-overlay button, #ui-overlay a, #ui-overlay .control-zone {
+      pointer-events: auto;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ---- HUD ---- */
+    #hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 16px;
+      padding-left: 110px;
+    }
+
+    #hud-left {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #score-display {
+      font-size: 18px;
+      color: #39ff14;
+      text-shadow: 0 0 10px rgba(57, 255, 20, 0.6);
+    }
+
+    #lives-display {
+      display: flex;
+      gap: 6px;
+    }
+
+    .life-icon {
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 14px solid #00fff5;
+      filter: drop-shadow(0 0 4px rgba(0, 255, 245, 0.6));
+    }
+
+    #wave-display {
+      font-size: 14px;
+      color: #00fff5;
+      text-shadow: 0 0 8px rgba(0, 255, 245, 0.5);
+    }
+
+    #pause-btn {
+      width: 48px;
+      height: 48px;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #pause-btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* ---- Controls ---- */
+    #controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 180px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 20px 24px;
+    }
+
+    #fire-btn {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, #ff4444, #cc0000);
+      border: 3px solid rgba(255,255,255,0.4);
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: box-shadow 0.05s;
+    }
+
+    #fire-btn:active, #fire-btn.active {
+      box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+      transform: scale(0.94);
+    }
+
+    #fire-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.8);
+      font-family: 'Press Start 2P', monospace;
+      pointer-events: none;
+    }
+
+    #joystick-zone {
+      width: 160px;
+      height: 160px;
+      position: relative;
+    }
+
+    #joystick-base {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+      border: 2px solid rgba(255,255,255,0.15);
+      position: absolute;
+      bottom: 0; right: 0;
+    }
+
+    #joystick-knob {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 2px solid rgba(255,255,255,0.3);
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      transition: background 0.1s;
+    }
+
+    #joystick-knob.active {
+      background: rgba(255,255,255,0.3);
+    }
+
+    /* ---- Wave Announcement ---- */
+    #wave-announce {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #wave-announce-text {
+      font-size: 36px;
+      color: #fff;
+      text-shadow:
+        0 0 20px #00fff5,
+        0 0 40px rgba(0, 255, 245, 0.4);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #wave-announce-text.visible {
+      opacity: 1;
+    }
+
+    #boss-warning {
+      font-size: 28px;
+      color: #ff3333;
+      text-shadow:
+        0 0 20px rgba(255, 51, 51, 0.8),
+        0 0 40px rgba(255, 51, 51, 0.4);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #boss-warning.visible {
+      opacity: 1;
+      animation: flash-warning 0.3s infinite;
+    }
+
+    @keyframes flash-warning {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ---- Start Screen ---- */
+    #start-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(180deg, #0a0020 0%, #0a0a0a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    #start-icon {
+      font-size: 72px;
+      margin-bottom: 16px;
+    }
+
+    #start-title {
+      font-size: 36px;
+      color: #00fff5;
+      text-shadow:
+        0 0 10px #00fff5,
+        0 0 30px rgba(0, 255, 245, 0.4);
+      letter-spacing: 6px;
+    }
+
+    #start-subtitle {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 3px;
+      margin-top: 8px;
+    }
+
+    #start-best {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 20px;
+    }
+
+    #start-play-btn {
+      margin-top: 40px;
+      padding: 18px 48px;
+      border-radius: 30px;
+      background: linear-gradient(135deg, #00fff5, #0099cc);
+      border: 3px solid rgba(255,255,255,0.5);
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0, 255, 245, 0.4);
+      animation: pulse 2s infinite;
+    }
+
+    #start-play-btn:active {
+      transform: scale(0.94);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* ---- Game Over Screen ---- */
+    #gameover-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    #gameover-label {
+      font-size: 12px;
+      letter-spacing: 4px;
+      color: #ff3333;
+      text-shadow: 0 0 10px rgba(255, 51, 51, 0.6);
+    }
+
+    #gameover-wave {
+      font-size: 14px;
+      color: #00fff5;
+      margin-top: 12px;
+    }
+
+    #gameover-score {
+      font-size: 48px;
+      color: #39ff14;
+      text-shadow: 0 0 16px rgba(57, 255, 20, 0.5);
+      margin-top: 8px;
+    }
+
+    #gameover-best {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 12px;
+    }
+
+    #gameover-new-record {
+      font-size: 14px;
+      color: #ffcc00;
+      text-shadow: 0 0 12px rgba(255, 204, 0, 0.6);
+      margin-top: 8px;
+      animation: flash-record 0.6s infinite;
+    }
+
+    @keyframes flash-record {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    #gameover-retry-btn {
+      margin-top: 32px;
+      padding: 18px 48px;
+      border-radius: 30px;
+      background: linear-gradient(135deg, #00fff5, #0099cc);
+      border: 3px solid rgba(255,255,255,0.5);
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0, 255, 245, 0.4);
+      animation: pulse 2s infinite;
+    }
+
+    #gameover-retry-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* ---- Pause Overlay ---- */
+    #pause-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    #pause-title {
+      font-size: 24px;
+      letter-spacing: 4px;
+    }
+
+    #pause-resume-btn {
+      margin-top: 32px;
+      padding: 16px 40px;
+      border-radius: 30px;
+      background: linear-gradient(135deg, #00fff5, #0099cc);
+      border: 3px solid rgba(255,255,255,0.5);
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #pause-resume-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* ---- Back to Arcade ---- */
+    #back-btn {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 200;
+      background: rgba(0,0,0,0.6);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: rgba(255,255,255,0.7);
+      font-size: 10px;
+      font-family: 'Press Start 2P', monospace;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      pointer-events: auto;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    #back-btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+  </style>
+</head>
+<body>
+  <a id="back-btn" href="/">← ARCADE</a>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="ui-overlay">
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="hud-left">
+        <div id="score-display">0</div>
+        <div id="lives-display">
+          <div class="life-icon"></div>
+          <div class="life-icon"></div>
+          <div class="life-icon"></div>
+        </div>
+      </div>
+      <div id="wave-display">WAVE 1</div>
+      <button id="pause-btn">⏸</button>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls" class="hidden">
+      <div id="fire-btn" class="control-zone">
+        <span id="fire-label">FIRE</span>
+      </div>
+      <div id="joystick-zone" class="control-zone">
+        <div id="joystick-base">
+          <div id="joystick-knob"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wave Announcement (center screen) -->
+    <div id="wave-announce">
+      <div id="boss-warning" class="hidden">WARNING</div>
+      <div id="wave-announce-text"></div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen">
+    <div id="start-icon">✈️</div>
+    <div id="start-title">DOGFIGHT</div>
+    <div id="start-subtitle">JET BATTLE</div>
+    <div id="start-best"></div>
+    <button id="start-play-btn">TAP TO PLAY</button>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="gameover-screen" class="hidden">
+    <div id="gameover-label">SHOT DOWN!</div>
+    <div id="gameover-wave">WAVE 1</div>
+    <div id="gameover-score">0</div>
+    <div id="gameover-best"></div>
+    <div id="gameover-new-record" class="hidden">NEW HIGH SCORE!</div>
+    <button id="gameover-retry-btn">TAP TO RETRY</button>
+  </div>
+
+  <!-- Pause Screen -->
+  <div id="pause-screen" class="hidden">
+    <div id="pause-title">PAUSED</div>
+    <button id="pause-resume-btn">RESUME</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
