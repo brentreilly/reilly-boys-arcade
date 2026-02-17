@@ -1,5 +1,5 @@
 /* ============================================
-   Hudson's Arcade — Retro Theme
+   The Reilly Boys Arcade — Retro Theme
    ============================================ */
 
 * {
@@ -51,10 +51,10 @@ header {
 /* ---- Game Grid ---- */
 .game-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
   padding: 24px;
-  max-width: 700px;
+  max-width: 500px;
   width: 100%;
   flex: 1;
 }
@@ -65,9 +65,9 @@ header {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 32px 16px;
-  min-height: 220px;
+  gap: 8px;
+  aspect-ratio: 1;
+  padding: 16px;
   background: #111;
   border: 3px solid #333;
   border-radius: 4px;
@@ -75,7 +75,6 @@ header {
   color: #fff;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
-  image-rendering: pixelated;
 }
 
 .game-card:active {
