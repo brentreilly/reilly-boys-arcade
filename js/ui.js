@@ -16,9 +16,6 @@ export class GameUI {
     // Touch state tracking for aim buttons
     this.aimLeftHeld = false;
     this.aimRightHeld = false;
-
-    // Spin selection: 0 = topspin, 1 = normal, 2 = backspin
-    this.selectedSpin = 1;
   }
 
   buildUI() {
@@ -48,13 +45,6 @@ export class GameUI {
         <div id="club-name">Driver</div>
         <button id="club-next" class="club-btn">&#9654;</button>
         <div id="club-distance">260 yds</div>
-      </div>
-
-      <div id="spin-selector">
-        <div id="spin-label">SPIN</div>
-        <button class="spin-btn touch-target" id="spin-top" data-spin="0">Roll</button>
-        <button class="spin-btn active touch-target" id="spin-normal" data-spin="1">Normal</button>
-        <button class="spin-btn touch-target" id="spin-back" data-spin="2">Bite</button>
       </div>
 
       <div id="touch-aim" class="hidden">
@@ -124,7 +114,6 @@ export class GameUI {
 
     this.buildScorecard();
     this.setupTouchAim();
-    this.setupSpinSelector();
   }
 
   setupTouchAim() {
@@ -156,39 +145,6 @@ export class GameUI {
     rightBtn.addEventListener('mousedown', startHold('right'));
     rightBtn.addEventListener('mouseup', stopHold('right'));
     rightBtn.addEventListener('mouseleave', stopHold('right'));
-  }
-
-  setupSpinSelector() {
-    const buttons = document.querySelectorAll('.spin-btn');
-    const selectSpin = (e) => {
-      e.preventDefault();
-      const val = parseInt(e.currentTarget.dataset.spin);
-      this.selectedSpin = val;
-      buttons.forEach(b => b.classList.remove('active'));
-      e.currentTarget.classList.add('active');
-    };
-    buttons.forEach(btn => {
-      btn.addEventListener('touchstart', selectSpin, { passive: false });
-      btn.addEventListener('click', selectSpin);
-    });
-  }
-
-  getSpinMultiplier() {
-    // 0=topspin(roll), 1=normal, 2=backspin(bite)
-    if (this.selectedSpin === 0) return -0.3;
-    if (this.selectedSpin === 2) return 2.0;
-    return 1.0;
-  }
-
-  showSpinSelector(show) {
-    document.getElementById('spin-selector').style.display = show ? 'flex' : 'none';
-  }
-
-  resetSpin() {
-    this.selectedSpin = 1;
-    const buttons = document.querySelectorAll('.spin-btn');
-    buttons.forEach(b => b.classList.remove('active'));
-    document.getElementById('spin-normal')?.classList.add('active');
   }
 
   buildScorecard() {
