@@ -390,7 +390,7 @@ export function createHoleTerrain(hole) {
     isInHole(x, z) {
       const dx = x - hole.pin.x;
       const dz = z - hole.pin.z;
-      return Math.sqrt(dx * dx + dz * dz) < 0.6;
+      return Math.sqrt(dx * dx + dz * dz) < 1.5; // bigger cup for kids
     },
 
     distanceToPin(x, z) {
@@ -445,7 +445,7 @@ function isOnFairway(x, z, fairwayPath) {
 export function getTreePositions(hole, terrain) {
   const positions = [];
   const holeMeters = hole.distance * YARDS_TO_METERS;
-  const density = hole.trees.density || 0.3;
+  const density = (hole.trees.density || 0.3) * 0.4; // reduced for mobile performance
   const spacing = 12 / density;
 
   for (let x = -55; x < 55; x += spacing) {

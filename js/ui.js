@@ -1,5 +1,5 @@
 // UI overlay: HUD, swing meter, club selector, scorecard, wind indicator
-// All rendered as HTML overlaid on the Three.js canvas
+// Touch-first controls for tablet play
 
 import { CLUBS, SURFACES } from './clubs.js';
 import { HOLES, COURSE_PAR } from './course.js';
@@ -12,6 +12,10 @@ export class GameUI {
   constructor() {
     this.container = document.getElementById('ui-overlay');
     this.buildUI();
+
+    // Touch state tracking for aim buttons
+    this.aimLeftHeld = false;
+    this.aimRightHeld = false;
   }
 
   buildUI() {
@@ -37,11 +41,18 @@ export class GameUI {
 
       <div id="club-selector">
         <div id="club-label">CLUB</div>
-        <button id="club-prev" class="club-btn">&larr;</button>
+        <button id="club-prev" class="club-btn">&#9664;</button>
         <div id="club-name">Driver</div>
-        <button id="club-next" class="club-btn">&rarr;</button>
+        <button id="club-next" class="club-btn">&#9654;</button>
         <div id="club-distance">260 yds</div>
       </div>
+
+      <div id="touch-aim" class="hidden">
+        <button id="aim-left" class="aim-btn touch-target">&#9664;</button>
+        <button id="aim-right" class="aim-btn touch-target">&#9654;</button>
+      </div>
+
+      <button id="swing-btn" class="hidden touch-target">SWING!</button>
 
       <div id="swing-meter" class="hidden">
         <div id="swing-meter-bg">
@@ -49,7 +60,7 @@ export class GameUI {
           <div id="swing-accuracy-marker"></div>
           <div id="swing-sweetspot"></div>
         </div>
-        <div id="swing-label">Press SPACE to swing</div>
+        <div id="swing-label">Tap SWING!</div>
       </div>
 
       <div id="aim-controls">
@@ -71,34 +82,69 @@ export class GameUI {
           </thead>
         </table>
         <div id="scorecard-total"></div>
-        <div id="scorecard-continue">Press SPACE to continue</div>
+        <div id="scorecard-continue">
+          <button class="tap-continue-btn touch-target" id="scorecard-next-btn">Next Hole</button>
+        </div>
       </div>
 
       <div id="message-overlay" class="hidden">
         <div id="message-text"></div>
         <div id="message-sub"></div>
+        <button class="tap-continue-btn touch-target" id="message-continue-btn" style="display:none">OK!</button>
       </div>
 
       <div id="game-start" class="hidden">
         <div id="start-title">LINKS</div>
         <div id="start-subtitle">A Golf Simulator</div>
-        <div id="start-prompt">Press SPACE to tee off</div>
-        <div id="start-controls">
-          <p><b>A / D</b> &mdash; Aim left / right</p>
-          <p><b>Q / E</b> &mdash; Change club</p>
-          <p><b>SPACE</b> &mdash; Swing (3-click: power, then accuracy)</p>
+        <div id="start-prompt">
+          <button class="tap-continue-btn touch-target" id="start-play-btn">Play!</button>
         </div>
+        <div id="start-controls"></div>
       </div>
 
       <div id="game-complete" class="hidden">
         <div id="complete-title">ROUND COMPLETE</div>
         <div id="complete-score"></div>
         <div id="complete-detail"></div>
-        <div id="complete-prompt">Press SPACE to play again</div>
+        <div id="complete-prompt">
+          <button class="tap-continue-btn touch-target" id="complete-play-btn">Play Again!</button>
+        </div>
       </div>
     `;
 
     this.buildScorecard();
+    this.setupTouchAim();
+  }
+
+  setupTouchAim() {
+    const leftBtn = document.getElementById('aim-left');
+    const rightBtn = document.getElementById('aim-right');
+
+    // Use touchstart/touchend for continuous hold behavior
+    const startHold = (dir) => (e) => {
+      e.preventDefault();
+      if (dir === 'left') this.aimLeftHeld = true;
+      else this.aimRightHeld = true;
+    };
+    const stopHold = (dir) => (e) => {
+      e.preventDefault();
+      if (dir === 'left') this.aimLeftHeld = false;
+      else this.aimRightHeld = false;
+    };
+
+    leftBtn.addEventListener('touchstart', startHold('left'), { passive: false });
+    leftBtn.addEventListener('touchend', stopHold('left'), { passive: false });
+    leftBtn.addEventListener('touchcancel', stopHold('left'), { passive: false });
+    leftBtn.addEventListener('mousedown', startHold('left'));
+    leftBtn.addEventListener('mouseup', stopHold('left'));
+    leftBtn.addEventListener('mouseleave', stopHold('left'));
+
+    rightBtn.addEventListener('touchstart', startHold('right'), { passive: false });
+    rightBtn.addEventListener('touchend', stopHold('right'), { passive: false });
+    rightBtn.addEventListener('touchcancel', stopHold('right'), { passive: false });
+    rightBtn.addEventListener('mousedown', startHold('right'));
+    rightBtn.addEventListener('mouseup', stopHold('right'));
+    rightBtn.addEventListener('mouseleave', stopHold('right'));
   }
 
   buildScorecard() {
@@ -175,19 +221,39 @@ export class GameUI {
       fill.style.background = power > 0.9 ? '#ff4444' : power > 0.7 ? '#ffaa00' : '#44cc44';
       marker.classList.add('hidden');
       sweetspot.classList.add('hidden');
-      label.textContent = `Power: ${Math.round(power * 100)}% \u2014 Press SPACE`;
+      label.textContent = `Power: ${Math.round(power * 100)}%`;
     } else if (phase === SWING_PHASE.ACCURACY) {
       fill.style.width = `${power * 100}%`;
       marker.classList.remove('hidden');
       sweetspot.classList.remove('hidden');
       const markerPos = (accuracyPos + 1) / 2 * 100;
       marker.style.left = `${markerPos}%`;
-      label.textContent = 'Accuracy \u2014 Press SPACE at center!';
+      label.textContent = 'Tap SWING at the green!';
     }
   }
 
   hideSwingMeter() {
     document.getElementById('swing-meter').classList.add('hidden');
+  }
+
+  showSwingButton(show) {
+    const btn = document.getElementById('swing-btn');
+    if (show) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
+
+  showTouchAim(show) {
+    const el = document.getElementById('touch-aim');
+    if (show) {
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+      this.aimLeftHeld = false;
+      this.aimRightHeld = false;
+    }
   }
 
   showShotResult(distance, quality) {
@@ -203,7 +269,12 @@ export class GameUI {
     el.classList.remove('hidden');
     document.getElementById('message-text').textContent = text;
     document.getElementById('message-sub').textContent = sub || '';
-    if (duration > 0) {
+
+    const continueBtn = document.getElementById('message-continue-btn');
+    if (duration === 0) {
+      continueBtn.style.display = 'inline-block';
+    } else {
+      continueBtn.style.display = 'none';
       setTimeout(() => el.classList.add('hidden'), duration);
     }
     return el;
@@ -214,7 +285,8 @@ export class GameUI {
   }
 
   showAimControls(show) {
-    document.getElementById('aim-controls').style.display = show ? 'block' : 'none';
+    // Keep old keyboard hint hidden; touch aim is separate
+    document.getElementById('aim-controls').style.display = 'none';
   }
 
   showClubSelector(show) {
@@ -271,12 +343,12 @@ export class GameUI {
     document.getElementById('complete-score').textContent = scoreText;
 
     let comment;
-    if (diff <= -5) comment = 'Incredible round! Are you a pro?';
-    else if (diff <= -2) comment = 'Excellent golf! Under par!';
-    else if (diff <= 0) comment = 'Solid round. Right around par.';
-    else if (diff <= 3) comment = 'Not bad! A few strokes to shave.';
-    else if (diff <= 8) comment = 'Keep practicing, you\'ll get there!';
-    else comment = 'Tough day on the course. Try again!';
+    if (diff <= -5) comment = 'WOW! You are amazing!';
+    else if (diff <= -2) comment = 'Awesome job! Super golfer!';
+    else if (diff <= 0) comment = 'Great round! Nice work!';
+    else if (diff <= 3) comment = 'Good game! Keep it up!';
+    else if (diff <= 8) comment = 'Nice try! You did great!';
+    else comment = 'Fun round! Let\'s play again!';
 
     document.getElementById('complete-detail').textContent = comment;
   }

@@ -27,7 +27,7 @@ export class BallState {
 
 export class PhysicsEngine {
   constructor() {
-    this.dt = 1 / 240;          // physics timestep (240 Hz for accuracy)
+    this.dt = 1 / 120;          // physics timestep (120 Hz — balanced for mobile)
     this.wind = { x: 0, y: 0, z: 0 };  // wind vector in m/s
     this.accumulator = 0;
     this.trailInterval = 0;
@@ -55,7 +55,7 @@ export class PhysicsEngine {
       // Putting: ball rolls along ground
       const puttSpeed = power * 8;  // max ~8 m/s for a long putt
       const aimRad = aimDirection * Math.PI / 180;
-      const accuracyOffset = (accuracy - 0.5) * 10; // degrees off-line
+      const accuracyOffset = (accuracy - 0.5) * 5; // degrees off-line (forgiving for kids)
 
       const totalAngle = aimRad + (accuracyOffset * Math.PI / 180);
       ball.velocity.x = puttSpeed * Math.sin(totalAngle);
@@ -71,8 +71,8 @@ export class PhysicsEngine {
       const launchRad = club.launchAngle * Math.PI / 180;
       const aimRad = aimDirection * Math.PI / 180;
 
-      // Accuracy affects sidespin and direction offset
-      const accuracyOffset = (accuracy - 0.5) * 15; // degrees off-line (-7.5 to +7.5)
+      // Accuracy affects sidespin and direction offset (reduced for kid-friendly play)
+      const accuracyOffset = (accuracy - 0.5) * 8; // degrees off-line (-4 to +4)
       const totalAim = aimRad + (accuracyOffset * Math.PI / 180);
 
       ball.velocity.x = speed * Math.cos(launchRad) * Math.sin(totalAim);

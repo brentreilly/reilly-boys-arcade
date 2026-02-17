@@ -16,9 +16,9 @@ export class SwingMeter {
     this.power = 0;           // 0-1
     this.accuracy = 0.5;      // 0-1 (0.5 = perfect center)
     this.powerDir = 1;        // direction of power bar
-    this.powerSpeed = 1.4;    // oscillations per second
+    this.powerSpeed = 0.7;    // oscillations per second (slow for kids)
     this.accuracyPos = 0;     // -1 to 1 oscillating
-    this.accuracySpeed = 2.2; // faster than power
+    this.accuracySpeed = 0.9; // slower accuracy for kids
     this.accuracyDir = 1;
     this.time = 0;
     this.isPutting = false;
@@ -36,11 +36,11 @@ export class SwingMeter {
     this.isPutting = isPutting;
 
     if (isPutting) {
-      this.powerSpeed = 1.0;
-      this.accuracySpeed = 1.8;
+      this.powerSpeed = 0.5;
+      this.accuracySpeed = 0.7;
     } else {
-      this.powerSpeed = 1.4;
-      this.accuracySpeed = 2.2;
+      this.powerSpeed = 0.7;
+      this.accuracySpeed = 0.9;
     }
   }
 
@@ -97,10 +97,10 @@ export class SwingMeter {
   // Get accuracy description
   getAccuracyLabel() {
     const dev = Math.abs(this.accuracy - 0.5);
-    if (dev < 0.05) return 'Perfect!';
-    if (dev < 0.12) return 'Great';
-    if (dev < 0.2) return 'Good';
-    if (dev < 0.3) return 'Okay';
+    if (dev < 0.15) return 'Perfect!';
+    if (dev < 0.25) return 'Great';
+    if (dev < 0.35) return 'Good';
+    if (dev < 0.45) return 'Okay';
     if (this.accuracy < 0.5) return 'Hook';
     return 'Slice';
   }

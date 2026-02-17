@@ -10,20 +10,21 @@ export class GolfRenderer {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: false,
       alpha: false,
+      powerPreference: 'low-power',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 800);
+    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 400);
 
     // Gradient sky background
-    this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.003);
+    this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.006);
     this.scene.background = this.createSkyGradient();
 
     // Lights
@@ -56,8 +57,8 @@ export class GolfRenderer {
     const sun = new THREE.DirectionalLight(0xFFF4D6, 1.8);
     sun.position.set(50, 80, 30);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
+    sun.shadow.mapSize.width = 512;
+    sun.shadow.mapSize.height = 512;
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 300;
     sun.shadow.camera.left = -80;
@@ -234,8 +235,8 @@ export class GolfRenderer {
     this.waterMeshes = [];
 
     // Build terrain mesh
-    const segsX = 140;
-    const segsZ = 180;
+    const segsX = 70;
+    const segsZ = 90;
     const geo = new THREE.PlaneGeometry(terrain.width, terrain.length, segsX, segsZ);
     geo.rotateX(-Math.PI / 2);
 

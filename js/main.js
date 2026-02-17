@@ -1,5 +1,6 @@
 // Main game orchestration: state machine, game loop, input handling
 // Ties together physics, renderer, UI, swing, camera, and course
+// Touch-first for tablet play
 
 import * as THREE from 'three';
 import { CLUBS, recommendClub, SURFACES } from './clubs.js';
@@ -50,7 +51,7 @@ class GolfGame {
     this.shotStartPos = null;
     this.stateTimer = 0;
 
-    // Input
+    // Input (keyboard still works too)
     this.keys = {};
     this.spacePressed = false;
 
@@ -64,6 +65,7 @@ class GolfGame {
   }
 
   setupInput() {
+    // Keyboard input (still works on desktop)
     window.addEventListener('keydown', (e) => {
       this.keys[e.key.toLowerCase()] = true;
       if (e.key === ' ' || e.code === 'Space') {
@@ -78,6 +80,59 @@ class GolfGame {
     // Club selector buttons
     document.getElementById('club-prev')?.addEventListener('click', () => this.prevClub());
     document.getElementById('club-next')?.addEventListener('click', () => this.nextClub());
+
+    // Touch: prevent default to avoid scrolling/zooming
+    document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+    // SWING button — the main touch action
+    const swingBtn = document.getElementById('swing-btn');
+    const triggerSwing = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.spacePressed = true;
+    };
+    swingBtn.addEventListener('touchstart', triggerSwing, { passive: false });
+    swingBtn.addEventListener('click', triggerSwing);
+
+    // Start screen "Play!" button
+    document.getElementById('start-play-btn')?.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
+    document.getElementById('start-play-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
+
+    // Hole intro "OK!" button
+    document.getElementById('message-continue-btn')?.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
+    document.getElementById('message-continue-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
+
+    // Scorecard "Next Hole" button
+    document.getElementById('scorecard-next-btn')?.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
+    document.getElementById('scorecard-next-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
+
+    // Game complete "Play Again!" button
+    document.getElementById('complete-play-btn')?.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
+    document.getElementById('complete-play-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.spacePressed = true;
+    });
   }
 
   loop(now) {
@@ -265,6 +320,8 @@ class GolfGame {
       0
     );
     this.ui.showClubSelector(false);
+    this.ui.showSwingButton(false);
+    this.ui.showTouchAim(false);
     this.ui.showAimControls(false);
     this.renderer.hideAimLine();
     this.renderer.clearTrail();
@@ -291,6 +348,8 @@ class GolfGame {
     this.ui.updateShotInfo(this.strokes, distToPin, surface);
     this.ui.updateClub(CLUBS[this.selectedClubIndex]);
     this.ui.showClubSelector(true);
+    this.ui.showSwingButton(true);
+    this.ui.showTouchAim(true);
     this.ui.showAimControls(true);
     this.renderer.clearTrail();
 
@@ -305,12 +364,23 @@ class GolfGame {
 
   updateAiming(dt) {
     const aimSpeed = 40; // degrees per second
+
+    // Keyboard aim
     if (this.keys['a'] || this.keys['arrowleft']) {
       this.aimDirection -= aimSpeed * dt;
     }
     if (this.keys['d'] || this.keys['arrowright']) {
       this.aimDirection += aimSpeed * dt;
     }
+
+    // Touch aim buttons
+    if (this.ui.aimLeftHeld) {
+      this.aimDirection -= aimSpeed * dt;
+    }
+    if (this.ui.aimRightHeld) {
+      this.aimDirection += aimSpeed * dt;
+    }
+
     if (this.keys['q']) {
       this.prevClub();
       this.keys['q'] = false;
@@ -353,7 +423,9 @@ class GolfGame {
     this.swing.start(false);
     this.ui.showAimControls(false);
     this.ui.showClubSelector(false);
+    this.ui.showTouchAim(false);
     this.renderer.hideAimLine();
+    // Keep swing button visible during swing phases
   }
 
   startPuttSwing() {
@@ -362,6 +434,7 @@ class GolfGame {
     this.swing.start(true);
     this.ui.showAimControls(false);
     this.ui.showClubSelector(false);
+    this.ui.showTouchAim(false);
     this.renderer.hideAimLine();
   }
 
@@ -372,6 +445,7 @@ class GolfGame {
     const accuracy = this.swing.accuracy;
 
     this.ui.hideSwingMeter();
+    this.ui.showSwingButton(false);
 
     // Store start position
     this.shotStartPos = { ...this.ball.position };
@@ -393,6 +467,7 @@ class GolfGame {
     const accuracy = this.swing.accuracy;
 
     this.ui.hideSwingMeter();
+    this.ui.showSwingButton(false);
 
     this.shotStartPos = { ...this.ball.position };
 
@@ -466,6 +541,8 @@ class GolfGame {
     this.scores.push(this.strokes);
 
     this.renderer.updateBall(this.ball.position, false, this.terrain ? this.terrain.getElevation(this.ball.position.x, this.ball.position.z) : 0);
+    this.ui.showSwingButton(false);
+    this.ui.showTouchAim(false);
 
     this.ui.showMessage(scoreName,
       `${this.strokes} stroke${this.strokes > 1 ? 's' : ''} on a Par ${this.currentHole.par}`,
