@@ -6,15 +6,16 @@ const WHEEL_BASE = 80;
 const BODY_WIDTH = 65;
 const BODY_HEIGHT = 22;
 const BODY_LIFT = 18;           // how high body sits above wheel center
-const GRAVITY = 800;            // heavier feel
-const GAS_FORCE = 300;          // slightly less force = hills matter more
-const BRAKE_FORCE = 220;
-const MAX_SPEED = 450;
+const GRAVITY = 1200;           // heavy truck — hills are real obstacles
+const GAS_FORCE = 700;          // powerful — need speed to launch off hills
+const BRAKE_FORCE = 700;
+const MAX_SPEED = 1500;
 const GROUND_FRICTION = 0.975;  // less friction = more sliding on hills
 const AIR_DRAG = 0.999;
-const ANGULAR_DAMPING = 0.93;   // less damping = spins more freely in air
-const BOUNCE_FACTOR = 0.3;      // landing bounce (0 = no bounce, 1 = full)
-const AIR_TILT_FORCE = 4.5;     // stronger air tilt = more control needed
+const ANGULAR_DAMPING = 0.96;   // heavy truck — sluggish rotation in air
+const BOUNCE_FACTOR = 0.25;     // suspension absorbs most of the impact
+const AIR_TILT_FORCE = 5.5;     // responsive air lean control
+const GROUND_TILT_FORCE = 6.0;  // wheelie/stoppie torque from gas/brake
 
 // Body color
 const BODY_COLOR = '#cc2200';
@@ -37,6 +38,7 @@ export class Truck {
     this.grounded = true;
     this.wheelSpin = 0;
     this.flipTimer = 0;
+    this.isFlipped = false;
     this.suspensionCompress = 0; // 0 = relaxed, 1 = fully compressed
   }
 
@@ -53,7 +55,8 @@ export class Truck {
     const slopeAngle = terrain.slopeAt(this.x);
 
     const wheelBottomY = this.y + WHEEL_RADIUS;
-    this.grounded = wheelBottomY >= terrainCenter - 5;
+    const groundLevel = (terrainRear + terrainFront) / 2; // average both wheels
+    this.grounded = wheelBottomY >= groundLevel - 5;
 
     // Ease suspension back to relaxed
     this.suspensionCompress *= 0.9;
@@ -65,32 +68,37 @@ export class Truck {
         this.vy = -impactForce;
         this.suspensionCompress = Math.min(1, this.vy / 400);
 
-        // Landing at an angle adds angular momentum
+        // Landing at an angle adds angular momentum (gentle — not a feedback loop)
         if (Math.abs(this.angle) > 0.2) {
-          this.angularVel += this.angle * 0.5;
+          this.angularVel += this.angle * 0.15;
         }
       } else {
-        // Snap to terrain
-        this.y = terrainCenter - WHEEL_RADIUS;
+        // Snap to terrain (average of both wheel contact points)
+        this.y = groundLevel - WHEEL_RADIUS;
         if (this.vy > 0) this.vy = 0;
       }
 
-      // Body angle from terrain slope
+      // Body angle from terrain slope (tighter tracking — truck hugs the ground)
       const targetAngle = Math.atan2(terrainFront - terrainRear, WHEEL_BASE);
       this.angle += (targetAngle - this.angle) * 0.25;
-      this.angularVel *= 0.8;
+      this.angularVel *= 0.88;
 
-      // Gas
+      // Gas — forward force + wheelie torque (nose up)
       if (input.gas) {
         this.vx += Math.cos(slopeAngle) * GAS_FORCE * dt;
         this.vy += Math.sin(slopeAngle) * GAS_FORCE * dt;
+        this.angularVel -= GROUND_TILT_FORCE * dt;
       }
 
-      // Brake / reverse
+      // Brake / reverse + stoppie torque (nose down)
       if (input.brake) {
         this.vx -= Math.cos(slopeAngle) * BRAKE_FORCE * dt;
         if (this.vx < -MAX_SPEED * 0.3) this.vx = -MAX_SPEED * 0.3;
+        this.angularVel += GROUND_TILT_FORCE * dt;
       }
+
+      // Apply angular velocity on ground (enables wheelie/stoppie lean)
+      this.angle += this.angularVel * dt;
 
       // Friction
       this.vx *= Math.pow(GROUND_FRICTION, dt * 60);
@@ -112,17 +120,7 @@ export class Truck {
       this.angularVel *= Math.pow(ANGULAR_DAMPING, dt * 60);
       this.angle += this.angularVel * dt;
 
-      // Flip detection — more sensitive (120° instead of 150°)
-      const absAngle = Math.abs(this.angle);
-      if (absAngle > Math.PI * 0.67) {
-        this.flipTimer += dt;
-        if (this.flipTimer > 1.5) {
-          this.angle = 0;
-          this.angularVel = 0;
-          this.vy = -80;
-          this.flipTimer = 0;
-        }
-      }
+      // No auto-right — flipping is now fatal on landing
     }
 
     // Clamp speed
@@ -133,8 +131,10 @@ export class Truck {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    // Don't go below terrain
-    const groundY = terrain.heightAt(this.x) - WHEEL_RADIUS;
+    // Don't go below terrain (use per-wheel average for consistency)
+    const rearGround = terrain.heightAt(this.x - Math.cos(this.angle) * halfBase);
+    const frontGround = terrain.heightAt(this.x + Math.cos(this.angle) * halfBase);
+    const groundY = (rearGround + frontGround) / 2 - WHEEL_RADIUS;
     if (this.y > groundY) {
       this.y = groundY;
       if (this.vy > 0) this.vy = 0;
@@ -142,6 +142,11 @@ export class Truck {
     }
 
     if (this.x < 0) { this.x = 0; this.vx = 0; }
+
+    // Flip death — if grounded and tilted past ~100°, truck is on its side/roof
+    if (this.grounded && Math.abs(this.angle) > Math.PI * 0.55) {
+      this.isFlipped = true;
+    }
 
     this.wheelSpin += this.vx * dt * 0.04;
   }

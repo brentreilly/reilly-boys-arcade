@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Neon Racers — Hudson's Arcade</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      overflow: hidden;
+      background: #0a0a0a;
+      font-family: 'Press Start 2P', monospace;
+      color: #fff;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ── UI Overlay ─────────────────────────────────────────────────── */
+    #ui-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #ui-overlay button,
+    #ui-overlay a,
+    #ui-overlay .touch-zone,
+    #ui-overlay .clickable {
+      pointer-events: auto;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ── Back Button ────────────────────────────────────────────────── */
+    #back-btn {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 200;
+      background: rgba(0,0,0,0.6);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: rgba(255,255,255,0.7);
+      font-size: 10px;
+      font-family: 'Press Start 2P', monospace;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      pointer-events: auto;
+      text-decoration: none;
+      display: inline-block;
+    }
+    #back-btn:active { background: rgba(255,255,255,0.2); }
+
+    /* ── Track Select Screen ────────────────────────────────────────── */
+    #track-select {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0a;
+      pointer-events: auto;
+      z-index: 50;
+    }
+
+    #track-select-title {
+      font-size: 20px;
+      color: #39ff14;
+      text-shadow: 0 0 20px #39ff14;
+      margin-bottom: 8px;
+    }
+
+    #track-select-subtitle {
+      font-size: 9px;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 24px;
+    }
+
+    #track-grid {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 0 20px;
+    }
+
+    .track-card {
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 10px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transition: border-color 0.2s, transform 0.1s;
+      position: relative;
+    }
+    .track-card:active { transform: scale(0.96); }
+    .track-card:not(.locked):hover,
+    .track-card:not(.locked):focus {
+      border-color: #39ff14;
+      outline: none;
+    }
+    .track-card.locked {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .track-preview {
+      width: 160px;
+      height: 120px;
+      background: #111;
+      border-radius: 6px;
+    }
+
+    .track-card-name {
+      font-size: 8px;
+      color: rgba(255,255,255,0.7);
+      text-align: center;
+    }
+
+    .track-lock {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+    }
+
+    /* ── Steer Zones ────────────────────────────────────────────────── */
+    #steer-zones {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      z-index: 5;
+      pointer-events: auto;
+    }
+    .steer-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Race HUD ───────────────────────────────────────────────────── */
+    #race-hud {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    #position-display {
+      font-size: 22px;
+      color: #ffe600;
+      text-shadow: 0 0 12px #ffe600;
+      transition: transform 0.3s, color 0.3s;
+    }
+    #position-display.position-up {
+      transform: scale(1.5);
+      color: #39ff14;
+      text-shadow: 0 0 20px #39ff14;
+    }
+
+    #lap-display {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 4px;
+    }
+
+    #pause-btn {
+      font-size: 20px;
+      background: rgba(0,0,0,0.4);
+      border: 2px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.6);
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #pause-btn:active { background: rgba(255,255,255,0.1); }
+
+    /* ── Countdown Overlay ──────────────────────────────────────────── */
+    #countdown-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+    }
+    #countdown-text {
+      font-size: 64px;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(255,255,255,0.5);
+      transition: transform 0.3s ease-out, color 0.2s;
+    }
+
+    /* ── Pause Screen ───────────────────────────────────────────────── */
+    #pause-screen {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 40;
+      pointer-events: auto;
+    }
+
+    #pause-screen .pause-title {
+      font-size: 24px;
+      color: #fff;
+    }
+
+    .btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 12px;
+      padding: 14px 28px;
+      border: 2px solid #39ff14;
+      background: rgba(57, 255, 20, 0.1);
+      color: #39ff14;
+      border-radius: 8px;
+      cursor: pointer;
+      min-width: 160px;
+      min-height: 48px;
+    }
+    .btn:active {
+      background: rgba(57, 255, 20, 0.3);
+    }
+    .btn-secondary {
+      border-color: rgba(255,255,255,0.3);
+      color: rgba(255,255,255,0.6);
+      background: rgba(255,255,255,0.05);
+    }
+    .btn-secondary:active {
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* ── Results Screen ─────────────────────────────────────────────── */
+    #results-screen {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 40;
+      pointer-events: auto;
+    }
+
+    #results-position {
+      font-size: 48px;
+      color: #ffe600;
+      text-shadow: 0 0 30px rgba(255, 230, 0, 0.5);
+    }
+
+    #results-message {
+      font-size: 16px;
+      color: #fff;
+    }
+
+    #unlock-message {
+      font-size: 11px;
+      color: #39ff14;
+      text-shadow: 0 0 10px #39ff14;
+      animation: unlockPulse 1s ease-in-out infinite alternate;
+    }
+
+    @keyframes unlockPulse {
+      from { opacity: 0.7; transform: scale(1); }
+      to { opacity: 1; transform: scale(1.05); }
+    }
+
+    .results-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <a id="back-btn" href="/">← ARCADE</a>
+
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Steering touch zones (full screen, behind UI) -->
+  <div id="steer-zones">
+    <div class="steer-zone" data-zone="left"></div>
+    <div class="steer-zone" data-zone="right"></div>
+  </div>
+
+  <div id="ui-overlay">
+    <!-- ── Track Select ──────────────────────────────────────────── -->
+    <div id="track-select">
+      <div id="track-select-title">NEON RACERS</div>
+      <div id="track-select-subtitle">SELECT A TRACK</div>
+      <div id="track-grid"></div>
+    </div>
+
+    <!-- ── Race HUD ──────────────────────────────────────────────── -->
+    <div id="race-hud" class="hidden">
+      <div>
+        <div id="position-display">4th</div>
+        <div id="lap-display">LAP 1/3</div>
+      </div>
+      <button id="pause-btn">⏸</button>
+    </div>
+
+    <!-- ── Countdown Overlay ─────────────────────────────────────── -->
+    <div id="countdown-overlay" class="hidden">
+      <div id="countdown-text">3</div>
+    </div>
+
+    <!-- ── Pause Screen ──────────────────────────────────────────── -->
+    <div id="pause-screen" class="hidden">
+      <div class="pause-title">PAUSED</div>
+      <button id="pause-resume-btn" class="btn">RESUME</button>
+      <button id="pause-quit-btn" class="btn btn-secondary">QUIT</button>
+    </div>
+
+    <!-- ── Results Screen ────────────────────────────────────────── -->
+    <div id="results-screen" class="hidden">
+      <div id="results-position">1st</div>
+      <div id="results-message">YOU WIN!</div>
+      <div id="unlock-message" class="hidden"></div>
+      <div class="results-buttons">
+        <button id="results-replay-btn" class="btn">RACE AGAIN</button>
+        <button id="results-next-btn" class="btn hidden">NEXT TRACK</button>
+        <button id="results-menu-btn" class="btn btn-secondary">MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
