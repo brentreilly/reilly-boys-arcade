@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Links - Golf Simulator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      overflow: hidden;
+      background: #1a1a1a;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #ui-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #ui-overlay button, #ui-overlay .clickable {
+      pointer-events: auto;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ---- HUD Top Bar ---- */
+    #hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 16px 24px;
+      gap: 20px;
+    }
+
+    #hole-info {
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      padding: 12px 20px;
+      border-radius: 10px;
+      color: #fff;
+    }
+
+    #hole-number {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 2px;
+    }
+
+    #hole-details {
+      font-size: 14px;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+
+    #hole-name {
+      font-size: 12px;
+      opacity: 0.6;
+      font-style: italic;
+      margin-top: 4px;
+    }
+
+    #wind-indicator {
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      padding: 10px 16px;
+      border-radius: 10px;
+      color: #fff;
+      text-align: center;
+      min-width: 70px;
+    }
+
+    #wind-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      opacity: 0.6;
+    }
+
+    #wind-arrow {
+      font-size: 28px;
+      line-height: 1;
+      transition: transform 0.3s;
+      display: inline-block;
+    }
+
+    #wind-speed {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    #shot-info {
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      padding: 12px 20px;
+      border-radius: 10px;
+      color: #fff;
+      text-align: right;
+    }
+
+    #stroke-count {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    #distance-to-pin {
+      font-size: 20px;
+      font-weight: 800;
+      color: #FFD700;
+      margin-top: 2px;
+    }
+
+    #lie-info {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    /* ---- Club Selector ---- */
+    #club-selector {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      padding: 10px 20px;
+      border-radius: 12px;
+      color: #fff;
+    }
+
+    #club-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      opacity: 0.5;
+    }
+
+    .club-btn {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      font-size: 18px;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: background 0.2s;
+    }
+
+    .club-btn:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    #club-name {
+      font-size: 18px;
+      font-weight: 700;
+      min-width: 140px;
+      text-align: center;
+    }
+
+    #club-distance {
+      font-size: 13px;
+      opacity: 0.6;
+      min-width: 60px;
+    }
+
+    /* ---- Swing Meter ---- */
+    #swing-meter {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+
+    #swing-meter-bg {
+      width: 300px;
+      height: 28px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 14px;
+      overflow: hidden;
+      position: relative;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+
+    #swing-power-fill {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 100%;
+      height: 0%;
+      background: #44cc44;
+      transition: height 0.02s linear;
+      border-radius: 0 0 12px 12px;
+    }
+
+    /* Rotate the fill to be horizontal */
+    #swing-meter-bg {
+      display: flex;
+      align-items: stretch;
+    }
+
+    #swing-power-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: 12px 0 0 12px;
+      transition: width 0.02s linear;
+    }
+
+    #swing-accuracy-marker {
+      position: absolute;
+      top: 0;
+      width: 4px;
+      height: 100%;
+      background: #fff;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 2px;
+      z-index: 2;
+    }
+
+    #swing-sweetspot {
+      position: absolute;
+      top: 2px;
+      left: calc(50% - 15px);
+      width: 30px;
+      height: calc(100% - 4px);
+      background: rgba(68, 204, 68, 0.3);
+      border: 1px solid rgba(68, 204, 68, 0.6);
+      border-radius: 4px;
+      z-index: 1;
+    }
+
+    #swing-label {
+      color: #fff;
+      font-size: 13px;
+      margin-top: 8px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    }
+
+    /* ---- Aim Controls Hint ---- */
+    #aim-controls {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .aim-hint {
+      color: rgba(255,255,255,0.6);
+      font-size: 13px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    }
+
+    /* ---- Shot Result ---- */
+    #shot-result {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      animation: fadeInUp 0.4s ease;
+    }
+
+    #result-distance {
+      font-size: 42px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+
+    #result-quality {
+      font-size: 18px;
+      color: #FFD700;
+      margin-top: 4px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translate(-50%, -40%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+
+    /* ---- Message Overlay ---- */
+    #message-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      animation: fadeInUp 0.5s ease;
+    }
+
+    #message-text {
+      font-size: 52px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.5);
+      letter-spacing: 2px;
+    }
+
+    #message-sub {
+      font-size: 18px;
+      color: rgba(255,255,255,0.8);
+      margin-top: 8px;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+    }
+
+    /* ---- Scorecard ---- */
+    #scorecard {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(12px);
+      padding: 30px 40px;
+      border-radius: 16px;
+      color: #fff;
+      animation: fadeInUp 0.4s ease;
+    }
+
+    #scorecard-title {
+      font-size: 14px;
+      letter-spacing: 4px;
+      text-align: center;
+      opacity: 0.5;
+      margin-bottom: 16px;
+    }
+
+    #scorecard-table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    #scorecard-table th, #scorecard-table td {
+      padding: 6px 10px;
+      text-align: center;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    #scorecard-table th {
+      font-weight: 600;
+      opacity: 0.6;
+    }
+
+    #scorecard-table .total {
+      font-weight: 800;
+      border-left: 2px solid rgba(255,255,255,0.2);
+      color: #FFD700;
+    }
+
+    #scorecard-total {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    #scorecard-continue {
+      text-align: center;
+      margin-top: 12px;
+      font-size: 12px;
+      opacity: 0.5;
+    }
+
+    /* ---- Game Start Screen ---- */
+    #game-start {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(135deg, #1a3a1a 0%, #0d1f0d 50%, #1a2a1a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+    }
+
+    #start-title {
+      font-size: 80px;
+      font-weight: 900;
+      letter-spacing: 16px;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      color: #e8e4d4;
+    }
+
+    #start-subtitle {
+      font-size: 16px;
+      letter-spacing: 6px;
+      opacity: 0.5;
+      margin-top: 8px;
+      text-transform: uppercase;
+    }
+
+    #start-prompt {
+      margin-top: 48px;
+      font-size: 16px;
+      opacity: 0.7;
+      animation: pulse 2s infinite;
+    }
+
+    #start-controls {
+      margin-top: 40px;
+      font-size: 14px;
+      opacity: 0.5;
+      line-height: 2;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ---- Game Complete ---- */
+    #game-complete {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+    }
+
+    #complete-title {
+      font-size: 14px;
+      letter-spacing: 6px;
+      opacity: 0.5;
+    }
+
+    #complete-score {
+      font-size: 64px;
+      font-weight: 900;
+      margin-top: 16px;
+      color: #FFD700;
+      text-shadow: 0 4px 16px rgba(255,215,0,0.3);
+    }
+
+    #complete-detail {
+      font-size: 18px;
+      opacity: 0.7;
+      margin-top: 12px;
+    }
+
+    #complete-prompt {
+      margin-top: 40px;
+      font-size: 14px;
+      opacity: 0.5;
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="ui-overlay"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
