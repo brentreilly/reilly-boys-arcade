@@ -244,20 +244,16 @@ export class Board {
     const piece = PIECES[type];
     const nextRotation = (rotation + 1) % piece.rotations.length;
 
-    // Try: no shift, shift left 1, shift right 1
-    if (!this.collides(type, nextRotation, col, row)) {
-      this.current.rotation = nextRotation;
-      return true;
-    }
-    if (!this.collides(type, nextRotation, col - 1, row)) {
-      this.current.rotation = nextRotation;
-      this.current.col -= 1;
-      return true;
-    }
-    if (!this.collides(type, nextRotation, col + 1, row)) {
-      this.current.rotation = nextRotation;
-      this.current.col += 1;
-      return true;
+    // Wall kicks: try no shift, then ±1, then ±2 for the I-piece
+    const kicks = [0, -1, 1];
+    if (type === 'I') kicks.push(-2, 2);
+
+    for (const kick of kicks) {
+      if (!this.collides(type, nextRotation, col + kick, row)) {
+        this.current.rotation = nextRotation;
+        this.current.col += kick;
+        return true;
+      }
     }
 
     return false; // rotation failed
@@ -409,4 +405,10 @@ export class Board {
     this.lines += linesCleared;
     this.level = Math.floor(this.lines / 10) + 1;
   }
+
+  // ── Public Accessors (for renderer / main) ────────────────────
+
+  get activePiece() { return this.current; }
+  get ghostY() { return this.getGhostRow(); }
+  get nextPiece() { return this.nextType ? { type: this.nextType, ...PIECES[this.nextType] } : null; }
 }
