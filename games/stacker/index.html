@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Stacker — The Reilly Boys Arcade</title>
+  <meta name="description" content="Neon block puzzle game in The Reilly Boys Arcade.">
+  <meta property="og:title" content="Stacker — The Reilly Boys Arcade">
+  <meta property="og:description" content="Neon block puzzle game.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://hudsonreilly.com/games/stacker/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Stacker — The Reilly Boys Arcade">
+  <meta name="twitter:description" content="Neon block puzzle game.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      overflow: hidden;
+      background: #0a0a0a;
+      color: #fff;
+      font-family: 'Press Start 2P', monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #ui-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #ui-overlay button, #ui-overlay a, #ui-overlay .touch-zone {
+      pointer-events: auto;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ---- HUD ---- */
+    #hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 16px;
+      padding-left: 110px;
+    }
+
+    #hud-left {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hud-stat {
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 2px;
+    }
+
+    .hud-stat span {
+      color: #39ff14;
+      font-size: 14px;
+      text-shadow: 0 0 10px rgba(57, 255, 20, 0.6);
+    }
+
+    #hud-right {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    #next-preview {
+      width: 64px;
+      height: 64px;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+    }
+
+    #pause-btn {
+      width: 48px;
+      height: 48px;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #pause-btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* ---- Touch Controls ---- */
+    #touch-controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100px;
+      display: flex;
+    }
+
+    .touch-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: rgba(255,255,255,0.15);
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .touch-zone:active, .touch-zone.active {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.3);
+    }
+
+    .touch-zone + .touch-zone {
+      border-left: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* ---- Start Screen ---- */
+    #start-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(180deg, #0a001a 0%, #0a0a0a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    #start-icon {
+      font-size: 72px;
+      margin-bottom: 16px;
+    }
+
+    #start-title {
+      font-size: 36px;
+      color: #39ff14;
+      text-shadow:
+        0 0 10px #39ff14,
+        0 0 30px rgba(57, 255, 20, 0.4);
+      letter-spacing: 6px;
+    }
+
+    #start-subtitle {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 3px;
+      margin-top: 8px;
+    }
+
+    #play-btn {
+      margin-top: 40px;
+      padding: 18px 48px;
+      border-radius: 30px;
+      background: linear-gradient(135deg, #39ff14, #20cc00);
+      border: 3px solid rgba(255,255,255,0.5);
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(57, 255, 20, 0.4);
+      animation: pulse 2s infinite;
+    }
+
+    #play-btn:active {
+      transform: scale(0.94);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* ---- Game Over Screen ---- */
+    #gameover-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    #gameover-label {
+      font-size: 12px;
+      letter-spacing: 4px;
+      color: #ff3333;
+      text-shadow: 0 0 10px rgba(255, 51, 51, 0.6);
+    }
+
+    #final-score {
+      font-size: 48px;
+      color: #39ff14;
+      text-shadow: 0 0 16px rgba(57, 255, 20, 0.5);
+      margin-top: 16px;
+    }
+
+    #best-score {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 12px;
+    }
+
+    #gameover-new-record {
+      font-size: 14px;
+      color: #ffcc00;
+      text-shadow: 0 0 12px rgba(255, 204, 0, 0.6);
+      margin-top: 8px;
+      animation: flash-record 0.6s infinite;
+    }
+
+    @keyframes flash-record {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    #restart-btn {
+      margin-top: 32px;
+      padding: 18px 48px;
+      border-radius: 30px;
+      background: linear-gradient(135deg, #39ff14, #20cc00);
+      border: 3px solid rgba(255,255,255,0.5);
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(57, 255, 20, 0.4);
+      animation: pulse 2s infinite;
+    }
+
+    #restart-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* ---- Pause Screen ---- */
+    #pause-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    #pause-title {
+      font-size: 24px;
+      letter-spacing: 4px;
+    }
+
+    .pause-btn {
+      margin-top: 24px;
+      padding: 16px 40px;
+      border-radius: 30px;
+      border: 3px solid rgba(255,255,255,0.5);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .pause-btn:active {
+      transform: scale(0.94);
+    }
+
+    #resume-btn {
+      background: linear-gradient(135deg, #39ff14, #20cc00);
+      color: #000;
+    }
+
+    #quit-btn {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      margin-top: 16px;
+    }
+
+    #quit-btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* ---- Back to Arcade ---- */
+    #back-btn {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 200;
+      background: rgba(0,0,0,0.6);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: rgba(255,255,255,0.7);
+      font-size: 10px;
+      font-family: 'Press Start 2P', monospace;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      pointer-events: auto;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    #back-btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+  </style>
+</head>
+<body>
+  <a id="back-btn" href="/">← ARCADE</a>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="ui-overlay">
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="hud-left">
+        <div class="hud-stat">SCORE <span id="score-value">0</span></div>
+        <div class="hud-stat">LINES <span id="lines-value">0</span></div>
+        <div class="hud-stat">LEVEL <span id="level-value">1</span></div>
+      </div>
+      <div id="hud-right">
+        <button id="pause-btn">⏸</button>
+      </div>
+    </div>
+
+    <!-- Touch Controls -->
+    <div id="touch-controls" class="hidden">
+      <div class="touch-zone" data-action="left">◀</div>
+      <div class="touch-zone" data-action="rotate">↻</div>
+      <div class="touch-zone" data-action="right">▶</div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen">
+    <div id="start-icon">🧱</div>
+    <div id="start-title">STACKER</div>
+    <div id="start-subtitle">BLOCK PUZZLE</div>
+    <button id="play-btn">TAP TO PLAY</button>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="gameover-screen" class="hidden">
+    <div id="gameover-label">GAME OVER</div>
+    <div id="final-score">0</div>
+    <div id="best-score"></div>
+    <div id="gameover-new-record" class="hidden">NEW RECORD!</div>
+    <button id="restart-btn">PLAY AGAIN</button>
+  </div>
+
+  <!-- Pause Screen -->
+  <div id="pause-screen" class="hidden">
+    <div id="pause-title">PAUSED</div>
+    <button id="resume-btn" class="pause-btn">RESUME</button>
+    <button id="quit-btn" class="pause-btn">QUIT</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
