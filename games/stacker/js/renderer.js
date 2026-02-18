@@ -185,6 +185,57 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  // ── Line Clear Flash ──────────────────────────────────────────
+  // Draw white overlay on cleared row Y positions, pulsing then fading out.
+  // yPositions: array of pixel Y coords; progress: 0→1 over animation duration.
+
+  renderLineClearFlash(yPositions, progress) {
+    const ctx = this.ctx;
+    const cs = this.cellSize;
+    const cols = 10;
+    // Pulse: bright at start, fade out
+    const alpha = 0.7 * (1 - progress);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffffff';
+    for (const y of yPositions) {
+      ctx.fillRect(this.gridX, y, cs * cols, cs);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Flash Text (STACKER!, LEVEL X) ──────────────────────────
+  // Large centered text that fades out. progress: 0→1.
+
+  renderFlashText(text, progress) {
+    const ctx = this.ctx;
+    const alpha = 1 - progress;
+    // Slight scale-up effect: start at 1x, end at 1.1x
+    const scale = 1 + progress * 0.1;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#39ff14';
+    ctx.font = '24px "Press Start 2P"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.translate(this.screenWidth / 2, this.screenHeight / 2);
+    ctx.scale(scale, scale);
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Game Over Fade ──────────────────────────────────────────
+  // Dark overlay over the grid area that fades in.
+
+  renderGameOverFade(fade) {
+    const ctx = this.ctx;
+    ctx.globalAlpha = 0.6 * fade;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(this.gridX, this.gridY, this.cellSize * 10, this.cellSize * 20);
+    ctx.globalAlpha = 1;
+  }
+
   // ── Next Piece Preview ─────────────────────────────────────────
   // Draws the next piece on the main canvas in the HUD area (top-right).
   // The piece is drawn centered within a small preview box.

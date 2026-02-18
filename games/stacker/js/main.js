@@ -31,6 +31,19 @@ class Game {
     this.lastTime = 0;
     this.prevLevel = 1;
 
+    // Visual polish state
+    this.clearingLines = false;
+    this.lineClearTimer = 0;
+    this.lineClearDuration = 0.2; // 200ms flash
+    this.clearFlashYs = [];       // Y pixel positions of cleared rows
+
+    this.shakeTimer = 0;
+    this.shakeIntensity = 0;
+
+    this.flashText = null; // { text, timer, duration }
+
+    this.gameOverFade = 0; // 0→1 fade-in on game over
+
     // 4. Cache DOM refs (avoid getElementById in loop)
     this.scoreEl = document.getElementById('score-value');
     this.linesEl = document.getElementById('lines-value');
@@ -110,7 +123,7 @@ class Game {
     this.canvas.addEventListener('pointermove', (e) => {
       if (this.swipeStartY !== null && this.state === STATE.PLAYING) {
         if (e.clientY - this.swipeStartY > 30) {
-          this.board.hardDrop();
+          this.doHardDrop();
           this.swipeStartY = null; // consume the swipe
         }
       }
@@ -125,7 +138,7 @@ class Game {
         case 'ArrowRight': this.board.moveRight(); break;
         case 'ArrowUp': this.board.rotate(); break;
         case 'ArrowDown': this.board.softDrop(); break;
-        case ' ': this.board.hardDrop(); break;
+        case ' ': this.doHardDrop(); break;
       }
     });
 
@@ -152,6 +165,13 @@ class Game {
     this.dropTimer = 0;
     this.state = STATE.PLAYING;
     this.prevLevel = 1;
+    this.clearingLines = false;
+    this.lineClearTimer = 0;
+    this.clearFlashYs = [];
+    this.shakeTimer = 0;
+    this.shakeIntensity = 0;
+    this.flashText = null;
+    this.gameOverFade = 0;
 
     document.getElementById('start-screen').classList.add('hidden');
     document.getElementById('gameover-screen').classList.add('hidden');
@@ -200,7 +220,7 @@ class Game {
     document.getElementById('start-screen').classList.remove('hidden');
   }
 
-  // --- Main loop (EXACT Summit pattern) ---
+  // --- Main loop (EXACT Summit pattern + visual polish) ---
   loop(time) {
     requestAnimationFrame((t) => this.loop(t)); // schedule at TOP, not bottom
 
@@ -212,16 +232,72 @@ class Game {
       this.update(dt);
     }
 
+    // Game over fade
+    if (this.state === STATE.GAME_OVER) {
+      this.gameOverFade = Math.min(this.gameOverFade + dt * 2, 1); // fade in over 0.5s
+    }
+
+    // Flash text timer (runs in all states so it finishes after game over)
+    if (this.flashText) {
+      this.flashText.timer += dt;
+      if (this.flashText.timer >= this.flashText.duration) this.flashText = null;
+    }
+
+    // Shake timer
+    if (this.shakeTimer > 0) this.shakeTimer -= dt;
+
     // Particles animate regardless of state (visual polish)
     this.particles.update(dt);
 
+    // Screen shake: save + translate before rendering
+    const shaking = this.shakeTimer > 0;
+    if (shaking) {
+      const ox = (Math.random() - 0.5) * this.shakeIntensity * 2;
+      const oy = (Math.random() - 0.5) * this.shakeIntensity * 2;
+      this.ctx.save();
+      this.ctx.translate(ox, oy);
+    }
+
     // Render always
     this.renderer.render(this.board);
+
+    // Line clear flash overlay
+    if (this.clearingLines && this.clearFlashYs.length > 0) {
+      const progress = this.lineClearTimer / this.lineClearDuration;
+      this.renderer.renderLineClearFlash(this.clearFlashYs, progress);
+    }
+
+    // Game over dark overlay
+    if (this.gameOverFade > 0) {
+      this.renderer.renderGameOverFade(this.gameOverFade);
+    }
+
+    // Flash text (STACKER!, LEVEL X)
+    if (this.flashText) {
+      const progress = this.flashText.timer / this.flashText.duration;
+      this.renderer.renderFlashText(this.flashText.text, progress);
+    }
+
     this.particles.render(this.ctx);
+
+    if (shaking) {
+      this.ctx.restore();
+    }
   }
 
   // --- Game logic ---
   update(dt) {
+    // Line clear animation: pause gravity until flash finishes
+    if (this.clearingLines) {
+      this.lineClearTimer += dt;
+      if (this.lineClearTimer >= this.lineClearDuration) {
+        this.clearingLines = false;
+        this.clearFlashYs = [];
+        this.board.lastClearedRows = [];
+      }
+      return; // skip gravity + input during line clear flash
+    }
+
     // Auto-repeat for held left/right
     const heldAction = this.getHeldDirection();
     if (heldAction) {
@@ -250,20 +326,82 @@ class Game {
       }
     }
 
-    // Check for line clears (particles)
+    // Check for line clears — trigger animation + particles
     if (this.board.lastClearedRows && this.board.lastClearedRows.length > 0) {
-      for (const row of this.board.lastClearedRows) {
-        const y = this.renderer.gridY + row * this.renderer.cellSize;
+      const cleared = this.board.lastClearedRows;
+
+      // Store Y pixel positions BEFORE we clear them (rows already removed from grid,
+      // but lastClearedRows holds original indices — use them for Y calculation)
+      this.clearFlashYs = cleared.map(
+        row => this.renderer.gridY + row * this.renderer.cellSize
+      );
+
+      // Enter line clear animation state
+      this.clearingLines = true;
+      this.lineClearTimer = 0;
+
+      // Emit particles for each cleared row
+      for (const y of this.clearFlashYs) {
         this.particles.emitLine(y, this.renderer.gridX, this.renderer.cellSize * this.board.cols, '#fff');
       }
-      // Clear so we don't re-emit
-      this.board.lastClearedRows = [];
+
+      // Screen shake — stronger for 4-line clear
+      this.shakeIntensity = cleared.length === 4 ? 4 : 2;
+      this.shakeTimer = cleared.length === 4 ? 0.25 : 0.12;
+
+      // STACKER! flash on 4-line clear
+      if (cleared.length === 4) {
+        this.flashText = { text: 'STACKER!', timer: 0, duration: 1.0 };
+      }
+
+      // Level up detection
+      if (this.board.level > this.prevLevel) {
+        this.prevLevel = this.board.level;
+        // Only show LEVEL text if not already showing STACKER!
+        if (!this.flashText || this.flashText.text !== 'STACKER!') {
+          this.flashText = { text: `LEVEL ${this.board.level}`, timer: 0, duration: 0.8 };
+        }
+      }
+    }
+
+    // Level up detection (also check on non-clear ticks, e.g. score from other sources)
+    if (this.board.level > this.prevLevel) {
+      this.prevLevel = this.board.level;
+      if (!this.flashText) {
+        this.flashText = { text: `LEVEL ${this.board.level}`, timer: 0, duration: 0.8 };
+      }
     }
 
     // Update HUD
     this.scoreEl.textContent = this.board.score;
     this.linesEl.textContent = this.board.lines;
     this.levelEl.textContent = this.board.level;
+  }
+
+  // --- Hard drop with particle effect ---
+  doHardDrop() {
+    if (!this.board.activePiece) return;
+    const piece = this.board.activePiece;
+    const pieceDef = PIECES[piece.type];
+    const matrix = pieceDef.rotations[piece.rotation];
+    const ghostRow = this.board.ghostY;
+
+    const dist = this.board.hardDrop();
+
+    // Emit particles at the landing position if the piece actually dropped
+    if (dist > 0) {
+      // Find the bottom-most filled cells of the piece for particle emission
+      for (let c = 0; c < matrix[0].length; c++) {
+        for (let r = matrix.length - 1; r >= 0; r--) {
+          if (matrix[r][c]) {
+            const px = this.renderer.gridX + (piece.col + c) * this.renderer.cellSize + this.renderer.cellSize * 0.5;
+            const py = this.renderer.gridY + (ghostRow + r) * this.renderer.cellSize + this.renderer.cellSize;
+            this.particles.emit(px, py, pieceDef.color, 3);
+            break; // only bottom cell per column
+          }
+        }
+      }
+    }
   }
 
   getHeldDirection() {
